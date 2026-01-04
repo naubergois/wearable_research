@@ -18,6 +18,10 @@ O objetivo principal é gerar figuras para artigos científicos que demonstrem:
 - `generate_figure_11.py`: Gera a **Figura 11** (Sinal BVP com mapa de calor de saliência temporal).
 - `export_metadata.py`: Exporta os dados brutos e configurações de todas as figuras para um arquivo JSON (`figures_metadata.json`).
 - `split_metadata.py`: Divide o arquivo de metadados combinado em arquivos individuais por figura.
+- `train_models.py`: Treina modelos LSTM e MLP com validação LOSO e gera estatísticas de desempenho.
+- `plot_confusion_matrices.py`: Gera as figuras das matrizes de confusão a partir dos resultados.
+- `consolidate_xai.py`: Consolida metadados de Feature Importance e Saliency em um único arquivo XAI.
+- `generate_figure_9.py`: Treina o modelo e gera as curvas de aprendizado (Loss).
 
 ### Outputs (Resultados)
 - **Imagens**: `figure_10.png`, `figure_11.png`, `figure_eda_time.png`, etc.
@@ -27,6 +31,9 @@ O objetivo principal é gerar figuras para artigos científicos que demonstrem:
     - `metadata_figure_11.json`: Dados específicos da Figura 11.
     - `metadata_time_domain.json`: Dados dos sinais no tempo.
     - `metadata_xai.json`: Consolidado de XAI (Feature Importance + Saliency).
+    - `training_results.json`: Resultados completos do treinamento (Métricas e Matrizes).
+    - `metadata_confusion_matrix.json`: Metadados específicos das matrizes de confusão (com AUC/F1).
+    - `metadata_figure_9.json`: Dados das curvas de aprendizado (Loss).
 
 ## Como Executar
 
