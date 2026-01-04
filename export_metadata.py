@@ -4,7 +4,7 @@ import numpy as np
 import matplotlib
 matplotlib.use('Agg')
 import visualize_signals
-import generate_figure_11
+import visualize_signals
 
 class NumpyEncoder(json.JSONEncoder):
     def default(self, obj):

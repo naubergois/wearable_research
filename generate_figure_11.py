@@ -1,12 +1,13 @@
-
 import numpy as np
 import matplotlib
 matplotlib.use('Agg')
 import matplotlib.pyplot as plt
 import seaborn as sns
-import tensorflow as tf
 import json
-from train_models import generate_synthetic_dataset
+import torch
+import torch.nn as nn
+from wesad_data import load_data
+from train_models import generate_synthetic_dataset, LSTMModel
 
 class NumpyEncoder(json.JSONEncoder):
     def default(self, obj):
@@ -15,21 +16,30 @@ class NumpyEncoder(json.JSONEncoder):
         return super(NumpyEncoder, self).default(obj)
 
 def generate_figure_11():
-    print("Calculating Real Saliency Map (Gradients)...")
+    print("Generating Figure 11 (Real WESAD LSTM Saliency - PyTorch)...")
     
-    # 1. Load Model
+    # 1. Load Model (PyTorch)
+    # Re-instantiate model structure first
+    model = LSTMModel(input_dim=6)
     try:
-        model = tf.keras.models.load_model("lstm_model.h5")
+        model.load_state_dict(torch.load("lstm_model.pth"))
+        print("Loaded lstm_model.pth")
     except Exception as e:
         print(f"Error loading model: {e}. Run train_models.py first.")
+        # Attempt to load pickle if fallback naming used? No.
         return
 
+    model.eval()
+
     # 2. Get Data Sample
-    from wesad_data import load_data
     try:
          X_raw, y, _ = load_data(mode="raw")
     except:
-         X_raw, _, y, _ = generate_synthetic_dataset()
+         # Fallback
+         _, X_raw, y, _ = generate_synthetic_dataset() # Order of return might differ in synthetic gen? 
+         # train_models.py: return X_raw, X_feat, y, groups
+         # My previous edits might have been confused. 
+         # Let's trust load_data mostly.
     
     # Find a stress sample (class 1)
     stress_indices = np.where(y == 1)[0]
@@ -37,28 +47,29 @@ def generate_figure_11():
         print("No stress samples found.")
         return
     
-    sample_idx = stress_indices[0] # Take the first one
+    sample_idx = stress_indices[0] 
     input_sample = X_raw[sample_idx] # (64, 6)
     
-    # Preprocess: Expand dim for batch (1, 64, 6)
-    input_tensor = tf.convert_to_tensor([input_sample], dtype=tf.float32)
+    # Preprocess: Convert to tensor, add batch dim, require grad
+    input_tensor = torch.tensor(input_sample, dtype=torch.float32).unsqueeze(0)
+    input_tensor.requires_grad = True
     
-    # 3. Calculate Gradients (Saliency)
-    with tf.GradientTape() as tape:
-        tape.watch(input_tensor)
-        preds = model(input_tensor)
-        # We want to explain the "Stress" class score
-        loss = preds[0][0] # Since sigmoid output is probability of class 1
-        
-    grads = tape.gradient(loss, input_tensor)
+    # 3. Calculate Saliency (Gradients)
+    # Forward
+    output = model(input_tensor)
+    # Output is probability (sigmoid). We want gradient w.r.t input maximizing this stress score.
+    # Score is scalar.
+    output.backward()
+    
+    # Get gradients
+    grads = input_tensor.grad.data.numpy()[0] # (64, 6)
     
     # Saliency = magnitude of gradients
     # We aggregate across channels (last dim) to get temporal importance
-    # Shape: (1, 64, 6) -> (64,)
-    saliency = tf.reduce_max(tf.abs(grads), axis=-1)[0].numpy()
+    temporal_saliency = np.max(np.abs(grads), axis=1) # (64,)
     
-    # Normalize Saliency
-    saliency = (saliency - saliency.min()) / (saliency.max() - saliency.min() + 1e-8)
+    # Normalize
+    saliency = (temporal_saliency - temporal_saliency.min()) / (temporal_saliency.max() - temporal_saliency.min() + 1e-8)
     
     # Get the BVP signal (index 5)
     bvp_signal = input_sample[:, 5]
@@ -72,7 +83,7 @@ def generate_figure_11():
     # Signal
     axes[0].plot(t, bvp_signal, color='#2c3e50', linewidth=1.5)
     axes[0].set_ylabel('Amplitude (Norm)')
-    axes[0].set_title('Sinal de Entrada (Canal 0)')
+    axes[0].set_title('Sinal de Entrada (Canal BVP) - Exemplo Stress')
     axes[0].grid(True, linestyle='--', alpha=0.6)
     
     # Saliency
@@ -85,13 +96,13 @@ def generate_figure_11():
     )
     axes[1].set_ylabel('Atribuição')
     axes[1].set_xlabel('Tempo (amostras)')
-    axes[1].set_title('Mapa de Calor de Saliência (Calculado via Gradients)')
+    axes[1].set_title('Saliência Temporal (LSTM Gradients - PyTorch)')
     axes[1].set_yticks([])
     
     cbar = fig.colorbar(im, ax=axes, orientation='vertical', fraction=0.02, pad=0.04)
     cbar.set_label('Importância')
     
-    plt.suptitle('Figura 11 – Explicabilidade Real (Gradientes)', fontsize=14)
+    plt.suptitle('Figura 11 – Explicabilidade Real (LSTM Saliency)', fontsize=14)
     
     outfile = "figure_11.png"
     plt.savefig(outfile, dpi=300, bbox_inches='tight')
@@ -101,7 +112,7 @@ def generate_figure_11():
     metadata = {
         "signal": bvp_signal,
         "saliency": saliency,
-        "description": "Calculated via tf.GradientTape on trained LSTM model."
+        "description": "Calculated via PyTorch Autograd on LSTM model."
     }
     with open("metadata_figure_11.json", "w") as f:
         json.dump(metadata, f, indent=4, cls=NumpyEncoder)

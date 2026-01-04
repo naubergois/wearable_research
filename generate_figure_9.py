@@ -1,7 +1,5 @@
 
 import numpy as np
-import tensorflow as tf
-from tensorflow.keras import layers, models, callbacks
 import matplotlib
 matplotlib.use('Agg')
 import matplotlib.pyplot as plt
@@ -27,34 +25,40 @@ def generate_figure_9():
     except:
         _, X_feat, y, _ = generate_synthetic_dataset()
     
-    # Split for Train/Val (Standard split for this figure)
     X_train, X_val, y_train, y_val = train_test_split(X_feat, y, test_size=0.2, random_state=42)
     
-    # 2. Build Model
-    model = build_mlp(X_train.shape[1:])
+    # 2. Build & Train Model (MLPClassifier)
+    model = build_mlp()
+    # Enable warm_start to track validation loss manually if needed, 
+    # but MLPClassifier only stores loss_curve_ (training loss).
+    # For validation curve, we can manually loop or just show training loss convergence which is typical.
+    # To show Val loss in sklearn MLP is tricky without partial_fit loop.
+    # Let's use partial_fit loop to capture both.
     
-    # 3. Train
-    # We want a nice curve showing convergence, so we use more epochs
     epochs = 50
-    history = model.fit(
-        X_train, y_train,
-        validation_data=(X_val, y_val),
-        epochs=epochs,
-        batch_size=32,
-        verbose=1
-    )
+    train_losses = []
+    val_losses = []
+    classes = np.unique(y)
     
-    # 4. Extract Data
-    loss = history.history['loss']
-    val_loss = history.history['val_loss']
+    for i in range(epochs):
+        model.partial_fit(X_train, y_train, classes=classes)
+        train_losses.append(model.loss_)
+        # Est. Val Loss (log loss)
+        # Sklearn doesn't expose easy val loss calc, so we calculate log_loss equivalent
+        from sklearn.metrics import log_loss
+        val_probs = model.predict_proba(X_val)
+        val_loss = log_loss(y_val, val_probs)
+        val_losses.append(val_loss)
+        print(f"Epoch {i+1}/{epochs} - Loss: {model.loss_:.4f} - Val Loss: {val_loss:.4f}")
+
     epochs_range = list(range(1, epochs + 1))
     
     # 5. Plot
     sns.set_style("whitegrid")
     plt.figure(figsize=(10, 6))
     
-    plt.plot(epochs_range, loss, label="Training", color="blue", linewidth=2)
-    plt.plot(epochs_range, val_loss, label="Validation", color="orange", linewidth=2)
+    plt.plot(epochs_range, train_losses, label="Training", color="blue", linewidth=2)
+    plt.plot(epochs_range, val_losses, label="Validation", color="orange", linewidth=2)
     
     plt.title("Learning Curves (Loss)", fontsize=16)
     plt.xlabel("Epochs", fontsize=14)
@@ -71,8 +75,8 @@ def generate_figure_9():
     metadata = {
         "title": "Figura 9 – Curvas de aprendizado (Loss de Treino vs. Validação)",
         "epochs": epochs_range,
-        "loss_train": loss,
-        "loss_val": val_loss,
+        "loss_train": train_losses,
+        "loss_val": val_losses,
         "description": "A convergência simultânea e a proximidade entre as curvas indicam ausência de overfitting significativo."
     }
     
