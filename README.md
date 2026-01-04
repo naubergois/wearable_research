@@ -26,6 +26,7 @@ O objetivo principal é gerar figuras para artigos científicos que demonstrem:
     - `metadata_figure_10.json`: Dados específicos da Figura 10.
     - `metadata_figure_11.json`: Dados específicos da Figura 11.
     - `metadata_time_domain.json`: Dados dos sinais no tempo.
+    - `metadata_xai.json`: Consolidado de XAI (Feature Importance + Saliency).
 
 ## Como Executar
 
@@ -103,6 +104,12 @@ Abaixo estão os resultados consolidados da execução com dados sintéticos (mo
 
 #### LSTM (Raw) - Validação LOSO
 ![LSTM Confusion Matrix](figure_confusion_matrix_lstm.png)
+
+
+### Curvas de Aprendizado (Learning Curves)
+![Curvas de Aprendizado](figure_9.png)
+
+**Figura 9** – Curvas de aprendizado (Loss de Treino vs. Validação). A convergência simultânea e a proximidade entre as curvas indicam ausência de overfitting significativo e boa capacidade de generalização (BENITA et al., 2024). A análise visual da Figura 9 demonstra um comportamento de convergência saudável para o modelo selecionado (MLP). Observa-se que ambas as curvas apresentam uma redução rápida da perda nas primeiras épocas, indicando que o otimizador Adam conseguiu encontrar eficientemente a direção do gradiente descendente na superfície de erro (SCHMIDT et al., 2018).
 
 _Legenda: TN=Verdadeiro Negativo, FP=Falso Positivo, FN=Falso Negativo, TP=Verdadeiro Positivo_
 
