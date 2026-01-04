@@ -165,14 +165,15 @@ def run_loso_validation(X, y, groups, model_builder, model_name="Model"):
         X_train, X_test = X[train_idx], X[test_idx]
         y_train, y_test = y[train_idx], y[test_idx]
         
-        # Flatten for non-deep models if needed (RF expects 2D)
-        if len(X_train.shape) > 2:
+        model = model_builder(None)
+
+        # Flatten for non-deep models if needed (RF/MLP expects 2D)
+        # Deep models (LSTM) expect 3D (N, Time, Feat)
+        if not isinstance(model, nn.Module) and len(X_train.shape) > 2:
             nsamples, nx, ny = X_train.shape
             X_train = X_train.reshape((nsamples, nx*ny))
             nsamples_test, _, _ = X_test.shape
             X_test = X_test.reshape((nsamples_test, nx*ny))
-        
-        model = model_builder(None)
         
         if isinstance(model, nn.Module):
             # --- PyTorch Training ---
