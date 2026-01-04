@@ -1,0 +1,36 @@
+{
+    "title": "Atribui\u00e7\u00e3o m\u00e9dia de import\u00e2ncia das caracter\u00edsticas (Integrated Gradients)",
+    "type": "bar_horizontal",
+    "data": {
+        "features": [
+            "HR",
+            "TEMP_slope",
+            "ACC_min",
+            "BVP_std",
+            "ACC_std",
+            "EDA_slope",
+            "EDA_mean",
+            "EDA_std",
+            "EDA_min",
+            "EDA_max",
+            "EDA_peaks"
+        ],
+        "importance": [
+            0.0893,
+            0.085,
+            0.0421,
+            0.038,
+            0.035,
+            0.02,
+            0.018,
+            0.015,
+            0.01,
+            0.008,
+            0.005
+        ]
+    },
+    "labels": {
+        "x": "Feature Importance",
+        "y": "Feature"
+    }
+}
