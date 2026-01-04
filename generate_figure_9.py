@@ -48,12 +48,12 @@ def generate_figure_9():
     sns.set_style("whitegrid")
     plt.figure(figsize=(10, 6))
     
-    plt.plot(epochs_range, loss, label="Treino", color="blue", linewidth=2)
-    plt.plot(epochs_range, val_loss, label="Validação", color="orange", linewidth=2)
+    plt.plot(epochs_range, loss, label="Training", color="blue", linewidth=2)
+    plt.plot(epochs_range, val_loss, label="Validation", color="orange", linewidth=2)
     
-    plt.title("Curvas de Aprendizado (Loss)", fontsize=16)
-    plt.xlabel("Épocas (Epochs)", fontsize=14)
-    plt.ylabel("Loss (Perda)", fontsize=14)
+    plt.title("Learning Curves (Loss)", fontsize=16)
+    plt.xlabel("Epochs", fontsize=14)
+    plt.ylabel("Loss", fontsize=14)
     plt.legend(fontsize=12)
     plt.grid(True, linestyle='--', alpha=0.7)
     
