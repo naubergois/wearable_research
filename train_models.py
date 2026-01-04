@@ -27,6 +27,17 @@ DEMO_MODE = False
 device = torch.device("cuda" if torch.cuda.is_available() else "mps" if torch.backends.mps.is_available() else "cpu")
 print(f"Using device: {device}")
 
+def save_checkpoint(filename, data):
+    with open(filename, "wb") as f:
+        pickle.dump(data, f)
+    # print(f"Checkpoint saved: {filename}")
+
+def load_checkpoint(filename):
+    if os.path.exists(filename):
+        with open(filename, "rb") as f:
+            return pickle.load(f)
+    return None
+
 class LSTMModel(nn.Module):
     def __init__(self, input_dim=6, hidden_dim=64, output_dim=1):
         super(LSTMModel, self).__init__()
@@ -117,9 +128,21 @@ def get_metrics(y_true, y_pred, y_prob=None):
 def run_loso_validation(X, y, groups, model_builder, model_name="Model"):
     logo = LeaveOneGroupOut()
     
-    y_true_all = []
-    y_pred_all = []
-    y_prob_all = []
+    # Checkpoint setup
+    ckpt_name = f"training_checkpoint_{model_name.lower().replace(' ', '_').replace('(', '').replace(')', '')}.pkl"
+    checkpoint = load_checkpoint(ckpt_name)
+    
+    if checkpoint:
+        print(f"Resuming {model_name} from checkpoint: {len(checkpoint['processed_subjects'])} subjects already done.")
+        y_true_all = checkpoint['y_true_all']
+        y_pred_all = checkpoint['y_pred_all']
+        y_prob_all = checkpoint['y_prob_all']
+        processed_subjects = checkpoint['processed_subjects']
+    else:
+        y_true_all = []
+        y_pred_all = []
+        y_prob_all = []
+        processed_subjects = set()
     
     print(f"\nScanning subjects for {model_name} LOSO...")
     
@@ -132,22 +155,29 @@ def run_loso_validation(X, y, groups, model_builder, model_name="Model"):
             break
             
         subject_id = np.unique(groups[test_idx])[0]
+        
+        if subject_id in processed_subjects:
+            # print(f"Skipping Subject S{subject_id} (Already processed)")
+            continue
+            
         # print(f"Validating on Subject S{subject_id} ({i+1}/{split_count})...")
         
         X_train, X_test = X[train_idx], X[test_idx]
         y_train, y_test = y[train_idx], y[test_idx]
         
+        # Flatten for non-deep models if needed (RF expects 2D)
+        if len(X_train.shape) > 2:
+            nsamples, nx, ny = X_train.shape
+            X_train = X_train.reshape((nsamples, nx*ny))
+            nsamples_test, _, _ = X_test.shape
+            X_test = X_test.reshape((nsamples_test, nx*ny))
+        
         model = model_builder(None)
-
+        
         if isinstance(model, nn.Module):
             # --- PyTorch Training ---
             model.to(device)
-            
-            # Prepare Tensors (Keep on CPU until batching usually, but for small data, GPU is fine)
-            # data is small enough to fit in GPU mem (350k floats ~ 1.4MB). 
-            # So lets move full tensors to device if we want or just batch.
-            # DataLoader with TensorDataset on GPU tensors is fast.
-            
+            # Prepare Tensors
             X_train_t = torch.tensor(X_train, dtype=torch.float32).to(device)
             y_train_t = torch.tensor(y_train, dtype=torch.float32).unsqueeze(1).to(device)
             X_test_t = torch.tensor(X_test, dtype=torch.float32).to(device)
@@ -158,12 +188,11 @@ def run_loso_validation(X, y, groups, model_builder, model_name="Model"):
             dataset = TensorDataset(X_train_t, y_train_t)
             dataloader = DataLoader(dataset, batch_size=64, shuffle=True)
             
-            epochs = 2 if DEMO_MODE else 15
+            epochs = 2 if DEMO_MODE else 15 
             
             model.train()
             for ep in range(epochs):
                 for xb, yb in dataloader:
-                    # xb, yb already on device
                     optimizer.zero_grad()
                     out = model(xb)
                     loss = criterion(out, yb)
@@ -174,19 +203,10 @@ def run_loso_validation(X, y, groups, model_builder, model_name="Model"):
             model.eval()
             with torch.no_grad():
                 pred_prob = model(X_test_t).cpu().detach().numpy().flatten()
-            
-            # Move model back to cpu for saving? Or save state_dict direct.
-            model.cpu() 
+            model.cpu()
             
         else:
             # --- Sklearn/Other Training ---
-            # Flatten for non-deep models (RF)
-            if len(X_train.shape) > 2:
-                nsamples, nx, ny = X_train.shape
-                X_train = X_train.reshape((nsamples, nx*ny))
-                nsamples_test, _, _ = X_test.shape
-                X_test = X_test.reshape((nsamples_test, nx*ny))
-                
             model.fit(X_train, y_train)
             if hasattr(model, "predict_proba"):
                 pred_prob = model.predict_proba(X_test)[:, 1]
@@ -195,17 +215,35 @@ def run_loso_validation(X, y, groups, model_builder, model_name="Model"):
 
         y_pred = (pred_prob >= 0.5).astype(int)
         
+        # Aggregate results
         y_true_all.extend(y_test)
         y_pred_all.extend(y_pred)
         y_prob_all.extend(pred_prob)
+        
+        processed_subjects.add(subject_id)
+        
+        # Save validation result checkpoint
+        save_checkpoint(ckpt_name, {
+            'y_true_all': y_true_all,
+            'y_pred_all': y_pred_all,
+            'y_prob_all': y_prob_all,
+            'processed_subjects': processed_subjects
+        })
     
-    # Save Model
+    # Save the LAST model trained (pickle instead of h5)
     if isinstance(model, nn.Module):
         torch.save(model.state_dict(), f"{model_name.split()[0].lower()}_model.pth")
     else:
         with open(f"{model_name.split()[0].lower()}_model.pkl", "wb") as f:
             pickle.dump(model, f)
             
+    # Cleanup checkpoint? Optional. 
+    # Maybe keep it or rename it? "done"? 
+    # For now keep it so user can't re-run accidentally without clearing?
+    # Or delete it to keep clean.
+    if os.path.exists(ckpt_name):
+        os.remove(ckpt_name)
+    
     print(f"Saved last {model_name} model")
     print(f"{model_name} LOSO Complete.")
     return np.array(y_true_all), np.array(y_pred_all), np.array(y_prob_all)
