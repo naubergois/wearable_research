@@ -98,6 +98,12 @@ Abaixo estão os resultados consolidados da execução com dados sintéticos (mo
 | **Real: No-Stress** | 995 (TN) | 119 (FP) |
 | **Real: Stress** | 53 (FN) | **390 (TP)** |
 
+#### MLP (Features) - Validação LOSO
+![MLP Confusion Matrix](figure_confusion_matrix_mlp.png)
+
+#### LSTM (Raw) - Validação LOSO
+![LSTM Confusion Matrix](figure_confusion_matrix_lstm.png)
+
 _Legenda: TN=Verdadeiro Negativo, FP=Falso Positivo, FN=Falso Negativo, TP=Verdadeiro Positivo_
 
 ## Notas

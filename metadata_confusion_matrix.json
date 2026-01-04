@@ -1,0 +1,42 @@
+{
+    "labels": [
+        "No-Stress",
+        "Stress"
+    ],
+    "matrices": {
+        "loso_mlp": {
+            "title": "MLP (Features) - LOSO Validation",
+            "values": [
+                [
+                    987,
+                    127
+                ],
+                [
+                    48,
+                    395
+                ]
+            ],
+            "metrics": {
+                "f1_stress": 0.8186528497409327,
+                "auc": 0.9572402948721586
+            }
+        },
+        "loso_lstm": {
+            "title": "LSTM (Raw) - LOSO Validation",
+            "values": [
+                [
+                    995,
+                    119
+                ],
+                [
+                    53,
+                    390
+                ]
+            ],
+            "metrics": {
+                "f1_stress": 0.819327731092437,
+                "auc": 0.9554267257275554
+            }
+        }
+    }
+}
