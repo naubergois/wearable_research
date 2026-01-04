@@ -102,7 +102,7 @@ def prepare_signals_and_labels(data):
     bvp_aligned    = bvp[idx_eda_to_bvp] 
     labels_aligned = labels[idx_eda_to_lbl]
     
-    return eda, temp_aligned, acc_aligned, bvp, labels_aligned
+    return eda, temp_aligned, acc_aligned, bvp_aligned, labels_aligned
 
 def extract_features(eda, temp, acc, bvp_raw, labels):
     """Extracts stats features for MLP."""
@@ -243,6 +243,8 @@ def load_data(mode="features"):
             
             X = np.array(X_wins)
             y = np.array(y_wins)
+            if mode == "raw":
+                print(f"Subject {subject_id}: X raw shape {X.shape}")
 
         if len(X) > 0:
             X_all.append(X)

@@ -23,6 +23,10 @@ FEAT_SHAPE = (22,)
 N_SAMPLES = 8447
 DEMO_MODE = False
 
+# Device config
+device = torch.device("cuda" if torch.cuda.is_available() else "mps" if torch.backends.mps.is_available() else "cpu")
+print(f"Using device: {device}")
+
 class LSTMModel(nn.Module):
     def __init__(self, input_dim=6, hidden_dim=64, output_dim=1):
         super(LSTMModel, self).__init__()
@@ -119,10 +123,16 @@ def run_loso_validation(X, y, groups, model_builder, model_name="Model"):
 
         if isinstance(model, nn.Module):
             # --- PyTorch Training ---
-            # Prepare Tensors
-            X_train_t = torch.tensor(X_train, dtype=torch.float32)
-            y_train_t = torch.tensor(y_train, dtype=torch.float32).unsqueeze(1)
-            X_test_t = torch.tensor(X_test, dtype=torch.float32)
+            model.to(device)
+            
+            # Prepare Tensors (Keep on CPU until batching usually, but for small data, GPU is fine)
+            # data is small enough to fit in GPU mem (350k floats ~ 1.4MB). 
+            # So lets move full tensors to device if we want or just batch.
+            # DataLoader with TensorDataset on GPU tensors is fast.
+            
+            X_train_t = torch.tensor(X_train, dtype=torch.float32).to(device)
+            y_train_t = torch.tensor(y_train, dtype=torch.float32).unsqueeze(1).to(device)
+            X_test_t = torch.tensor(X_test, dtype=torch.float32).to(device)
             
             criterion = nn.BCELoss()
             optimizer = optim.Adam(model.parameters(), lr=0.001)
@@ -135,6 +145,7 @@ def run_loso_validation(X, y, groups, model_builder, model_name="Model"):
             model.train()
             for ep in range(epochs):
                 for xb, yb in dataloader:
+                    # xb, yb already on device
                     optimizer.zero_grad()
                     out = model(xb)
                     loss = criterion(out, yb)
@@ -144,7 +155,10 @@ def run_loso_validation(X, y, groups, model_builder, model_name="Model"):
             # Predict
             model.eval()
             with torch.no_grad():
-                pred_prob = model(X_test_t).detach().numpy().flatten()
+                pred_prob = model(X_test_t).cpu().detach().numpy().flatten()
+            
+            # Move model back to cpu for saving? Or save state_dict direct.
+            model.cpu() 
             
         else:
             # --- Sklearn/Other Training ---
@@ -190,9 +204,10 @@ def run_standard_validation(X, y, model_builder, model_name="Model"):
 
     if isinstance(model, nn.Module):
         # PyTorch
-        X_train_t = torch.tensor(X_train, dtype=torch.float32)
-        y_train_t = torch.tensor(y_train, dtype=torch.float32).unsqueeze(1)
-        X_test_t = torch.tensor(X_test, dtype=torch.float32)
+        model.to(device)
+        X_train_t = torch.tensor(X_train, dtype=torch.float32).to(device)
+        y_train_t = torch.tensor(y_train, dtype=torch.float32).unsqueeze(1).to(device)
+        X_test_t = torch.tensor(X_test, dtype=torch.float32).to(device)
         
         criterion = nn.BCELoss()
         optimizer = optim.Adam(model.parameters(), lr=0.001)
@@ -213,7 +228,8 @@ def run_standard_validation(X, y, model_builder, model_name="Model"):
         
         model.eval()
         with torch.no_grad():
-            pred_prob = model(X_test_t).detach().numpy().flatten()
+            pred_prob = model(X_test_t).cpu().detach().numpy().flatten()
+        model.cpu()
             
     else:
         # Sklearn/RF
@@ -244,6 +260,7 @@ def main():
 
     # 1. Processing MLP (Features)
     print("\n[1/2] Processing MLP (Features)...")
+    results = {}
     try:
         X_feat, y_feat, groups_feat = load_data(mode="features")
         print(f"Features Loaded: {X_feat.shape}")
