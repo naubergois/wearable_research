@@ -2,98 +2,109 @@
 import numpy as np
 import matplotlib.pyplot as plt
 import seaborn as sns
+import tensorflow as tf
+import json
+from train_models import generate_synthetic_dataset
+
+class NumpyEncoder(json.JSONEncoder):
+    def default(self, obj):
+        if isinstance(obj, np.ndarray):
+            return obj.tolist()
+        return super(NumpyEncoder, self).default(obj)
 
 def generate_figure_11():
-    # Configuration
-    fs = 64  # Hz
-    duration_sec = 16
-    t = np.linspace(0, duration_sec, duration_sec * fs)
+    print("Calculating Real Saliency Map (Gradients)...")
+    
+    # 1. Load Model
+    try:
+        model = tf.keras.models.load_model("lstm_model.h5")
+    except Exception as e:
+        print(f"Error loading model: {e}. Run train_models.py first.")
+        return
 
-    # 1. Generate Synthetic BVP Signal (simulating "physiological oscillations")
-    # Base heart rate ~ 75 bpm -> 1.25 Hz
-    hr_freq = 1.25 
+    # 2. Get Data Sample
+    X_raw, _, y, _ = generate_synthetic_dataset()
     
-    # Create a realistic-looking pulse wave: sum of sines to approximate systolic peak + dicrotic notch
-    pulse = (
-        1.0 * np.sin(2 * np.pi * hr_freq * t) + 
-        0.5 * np.sin(2 * np.pi * 2 * hr_freq * t + 0.5) +  # Harmonic for shape
-        0.2 * np.sin(2 * np.pi * 3 * hr_freq * t + 1.0)
-    )
+    # Find a stress sample (class 1)
+    stress_indices = np.where(y == 1)[0]
+    if len(stress_indices) == 0:
+        print("No stress samples found.")
+        return
     
-    # Add amplitude modulation (respiratory sinus arrhythmia-ish)
-    modulation = 1.0 + 0.2 * np.sin(2 * np.pi * 0.2 * t) 
+    sample_idx = stress_indices[0] # Take the first one
+    input_sample = X_raw[sample_idx] # (64, 6)
     
-    # Add some "phasic events" - bursts of higher intensity
-    phasic_events = np.zeros_like(t)
-    # Event around 4-6s
-    phasic_events[int(4*fs):int(6*fs)] = 0.5 * np.hanning(int(2*fs))
-    # Event around 10-12s
-    phasic_events[int(10*fs):int(12*fs)] = 0.8 * np.hanning(int(2*fs))
+    # Preprocess: Expand dim for batch (1, 64, 6)
+    input_tensor = tf.convert_to_tensor([input_sample], dtype=tf.float32)
     
-    bvp_signal = pulse * modulation + phasic_events
+    # 3. Calculate Gradients (Saliency)
+    with tf.GradientTape() as tape:
+        tape.watch(input_tensor)
+        preds = model(input_tensor)
+        # We want to explain the "Stress" class score
+        loss = preds[0][0] # Since sigmoid output is probability of class 1
+        
+    grads = tape.gradient(loss, input_tensor)
     
-    # Normalize (as per description "sinal fisiológico bruto normalizado")
-    bvp_normalized = (bvp_signal - np.mean(bvp_signal)) / np.std(bvp_signal)
-
-    # 2. Generate Saliency Map (Attribution)
-    # Description: "regiões de maior atribuição concentram-se em intervalos temporais específicos"
-    # We will attribute high importance to the peaks of the signal, especially during phasic events
+    # Saliency = magnitude of gradients
+    # We aggregate across channels (last dim) to get temporal importance
+    # Shape: (1, 64, 6) -> (64,)
+    saliency = tf.reduce_max(tf.abs(grads), axis=-1)[0].numpy()
     
-    # Start with baseline importance
-    saliency = 0.1 * np.abs(bvp_normalized)
+    # Normalize Saliency
+    saliency = (saliency - saliency.min()) / (saliency.max() - saliency.min() + 1e-8)
     
-    # Add "heat" to the specific events mentioned above
-    # Higher saliency exactly where the BVP amplitude is largest (peaks)
-    # and locally concentrated during the "events"
+    # Get the BVP signal (index 5 in our synthetic gen: EDA, TEMP, ACCx,y,z, BVP)
+    # Wait, in generate_synthetic_dataset: 
+    # X_raw = np.random.randn(N_SAMPLES, 64, 6)
+    # It doesn't explicitly name cols, but let's assume BVP is the one we modified with sine waves?
+    # "X_raw[y == 1, :, 0] += ..." -> Index 0 has the signal added for stress.
+    # So let's visualize Index 0 as our "Signal of Interest"
+    bvp_signal = input_sample[:, 0]
     
-    # Envelope of the signal for general regional importance
-    envelope = np.abs(bvp_normalized)
-    saliency = envelope ** 2  # Squaring enhances peaks
+    # Time axis
+    t = np.arange(len(bvp_signal))
     
-    # Smooth slightly to make it look like a heatmap of attribution
-    kernel_size = int(0.1 * fs)
-    saliency = np.convolve(saliency, np.ones(kernel_size)/kernel_size, mode='same')
-    
-    # Normalize saliency for visualization (0 to 1)
-    saliency = (saliency - np.min(saliency)) / (np.max(saliency) - np.min(saliency))
-
-    # 3. Plotting
+    # 4. Plotting
     fig, axes = plt.subplots(2, 1, figsize=(12, 6), sharex=True, gridspec_kw={'height_ratios': [2, 1]})
     
-    # Top Panel: BVP Signal
-    axes[0].plot(t, bvp_normalized, color='#2c3e50', linewidth=1.5)
-    axes[0].set_ylabel('Amplitude Normalizada')
-    axes[0].set_title('Sinal BVP (Normalizado)')
+    # Signal
+    axes[0].plot(t, bvp_signal, color='#2c3e50', linewidth=1.5)
+    axes[0].set_ylabel('Amplitude (Norm)')
+    axes[0].set_title('Sinal de Entrada (Canal 0)')
     axes[0].grid(True, linestyle='--', alpha=0.6)
     
-    # Highlight some "phasic events" visually if needed, but the text says points are highlighted.
-    # We'll just let the signal speak for itself as "oscilações periódicas" are visible.
-
-    # Bottom Panel: Saliency Heatmap
-    # imshow expects 2D, so we expand dimensions
+    # Saliency
     im = axes[1].imshow(
         saliency[np.newaxis, :], 
         aspect='auto', 
-        cmap='RdBu_r', # Warm colors (Red) for high, Cold (Blue) for low
+        cmap='RdBu_r', 
         extent=[t[0], t[-1], 0, 1],
         vmin=0, vmax=1
     )
-    
     axes[1].set_ylabel('Atribuição')
-    axes[1].set_xlabel('Tempo (s)')
-    axes[1].set_title('Mapa de Calor de Atribuição Temporal')
-    axes[1].set_yticks([]) # Hide y ticks for heatmap strip
+    axes[1].set_xlabel('Tempo (amostras)')
+    axes[1].set_title('Mapa de Calor de Saliência (Calculado via Gradients)')
+    axes[1].set_yticks([])
     
-    # Add colorbar
     cbar = fig.colorbar(im, ax=axes, orientation='vertical', fraction=0.02, pad=0.04)
-    cbar.set_label('Importância Relativa')
-
-    plt.suptitle('Figura 11 – Análise Temporal Local (BVP)', fontsize=14)
+    cbar.set_label('Importância')
     
-    # Save
+    plt.suptitle('Figura 11 – Explicabilidade Real (Gradientes)', fontsize=14)
+    
     outfile = "figure_11.png"
     plt.savefig(outfile, dpi=300, bbox_inches='tight')
     print(f"Figure saved as {outfile}")
+    
+    # Save Metadata
+    metadata = {
+        "signal": bvp_signal,
+        "saliency": saliency,
+        "description": "Calculated via tf.GradientTape on trained LSTM model."
+    }
+    with open("metadata_figure_11.json", "w") as f:
+        json.dump(metadata, f, indent=4, cls=NumpyEncoder)
+    print("Metadata Saved.")
 
 if __name__ == "__main__":
     generate_figure_11()

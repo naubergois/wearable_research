@@ -148,6 +148,12 @@ def run_loso_validation(X, y, groups, model_builder, model_name="Model"):
         y_prob_all.extend(pred_prob)
         
         tf.keras.backend.clear_session()
+    
+    # Save the LAST model trained (from the last fold) for XAI purposes
+    # Ideally we'd pick the best, but for XAI demo, the last valid one works.
+    model_save_path = f"{model_name.split()[0].lower()}_model.h5"
+    model.save(model_save_path)
+    print(f"Saved last {model_name} model to {model_save_path}")
         
     print(f"{model_name} LOSO Complete.")
     return np.array(y_true_all), np.array(y_pred_all), np.array(y_prob_all)

@@ -122,4 +122,4 @@ _Legenda: TN=Verdadeiro Negativo, FP=Falso Positivo, FN=Falso Negativo, TP=Verda
 
 ## Notas
 - Caso o arquivo de dados original (`.pkl` do WESAD) não esteja presente na pasta, o script `visualize_signals.py` gerará dados sintéticos realistas para fins de demonstração e calibração dos gráficos.
-- As Figuras 10 e 11 utilizam parâmetros fixos ou gerados proceduralmente para garantir que correspondam estritamente às descrições científicas fornecidas.
+- **Figuras XAI Calculadas**: As Figuras 10 (Feature Importance) e 11 (Saliency Map) são agora calculadas dinamicamente usando os modelos treinados (`mlp_model.h5` e `lstm_model.h5`), refletindo o aprendizado real sobre os dados sintéticos, em vez de valores simulados.
