@@ -11,11 +11,11 @@ import pandas as pd
 import json
 
 # Configuration
-WESAD_ROOT = "/content/wesad/WESAD"
+WESAD_ROOT = "wesad/WESAD"
 RAW_SHAPE = (64, 6) # 64 timesteps, 6 channels (EDA, TEMP, ACC_x,y,z, BVP)
 FEAT_SHAPE = (22,)  # 22 statistical features
 N_SAMPLES = 8447    # Exact number from user request
-DEMO_MODE = True    # Set to False for full LOSO validation takes ~1 hour
+DEMO_MODE = False    # Set to False for full LOSO validation takes ~1 hour
 
 def load_subject_pkl(path):
     with open(path, "rb") as f:
@@ -191,25 +191,49 @@ def run_standard_validation(X, y, model_builder, model_name="Model"):
     tf.keras.backend.clear_session()
     return y_test, y_pred, pred_prob
 
+from wesad_data import load_data
+
 def main():
-    X_raw, X_feat, y, groups = generate_synthetic_dataset()
+    print("Loading Real WESAD Data...")
+    
+    # Load Features for MLP
+    print("\n--- Loading Features (for MLP) ---")
+    try:
+        X_feat, y_feat, groups_feat = load_data(mode="features")
+        print(f"Features: {X_feat.shape}, Labels: {y_feat.shape}")
+    except Exception as e:
+        print(f"Failed to load features: {e}")
+        return
+
+    # Load Raw for LSTM
+    print("\n--- Loading Raw Signals (for LSTM) ---")
+    try:
+        X_raw, y_raw, groups_raw = load_data(mode="raw")
+        print(f"Raw: {X_raw.shape}, Labels: {y_raw.shape}")
+    except Exception as e:
+        print(f"Failed to load raw data: {e}")
+        return
+    
+    # Ensure consistent labels implies we should ideally use the same split or be careful.
+    # Since we loaded them separately (features vs raw), the underlying windows *should* be identical 
+    # if parameters match in wesad_data.
     
     results = {}
 
     # --- LOSO Validation ---
     print("\n--- Starting LOSO Validation ---")
-    y_true, y_pred, y_prob = run_loso_validation(X_feat, y, groups, build_mlp, "MLP (Features)")
+    y_true, y_pred, y_prob = run_loso_validation(X_feat, y_feat, groups_feat, build_mlp, "MLP (Features)")
     results["loso_mlp"] = get_metrics(y_true, y_pred, y_prob)
     
-    y_true, y_pred, y_prob = run_loso_validation(X_raw, y, groups, build_lstm, "LSTM (Raw)")
+    y_true, y_pred, y_prob = run_loso_validation(X_raw, y_raw, groups_raw, build_lstm, "LSTM (Raw)")
     results["loso_lstm"] = get_metrics(y_true, y_pred, y_prob)
     
     # --- Standard Validation (Non-LOSO) ---
     print("\n--- Starting Standard Validation (Non-LOSO) ---")
-    y_true, y_pred, y_prob = run_standard_validation(X_feat, y, build_mlp, "MLP (Features)")
+    y_true, y_pred, y_prob = run_standard_validation(X_feat, y_feat, build_mlp, "MLP (Features)")
     results["standard_mlp"] = get_metrics(y_true, y_pred, y_prob)
     
-    y_true, y_pred, y_prob = run_standard_validation(X_raw, y, build_lstm, "LSTM (Raw)")
+    y_true, y_pred, y_prob = run_standard_validation(X_raw, y_raw, build_lstm, "LSTM (Raw)")
     results["standard_lstm"] = get_metrics(y_true, y_pred, y_prob)
 
     # Export

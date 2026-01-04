@@ -1,12 +1,14 @@
 
 import numpy as np
+import matplotlib
+matplotlib.use('Agg')
 import matplotlib.pyplot as plt
 import seaborn as sns
 import os
 import pickle
 
 # Configuration
-WESAD_ROOT = "/content/wesad/WESAD" # Default path from original script, likely not valid here
+WESAD_ROOT = "wesad/WESAD" # Correct relative path
 TARGET_Subject = "S2" # Example subject
 
 def load_subject_pkl(path):
@@ -99,21 +101,28 @@ def plot_signals(data):
     plt.savefig('figure_acc_time.png', dpi=300)
     print("Saved figure_acc_time.png")
 
-def main():
-    # Try to find any .pkl file
-    data = None
+def get_real_data():
+    """Attempts to load the first available WESAD subject data."""
+    # Check current directory and subdirectories for any S*.pkl
+    # We prioritize the configured WESAD_ROOT if possible, but the original logic searched "."
     
-    # Check current directory and subdirectories
-    for root, dirs, files in os.walk("."):
-        for file in files:
-            if file.endswith(".pkl") and file.startswith("S"):
-               try:
-                   print(f"Found data file: {file}")
-                   data = load_subject_pkl(os.path.join(root, file))
-                   break
-               except Exception as e:
-                   print(f"Error loading {file}: {e}")
-        if data: break
+    search_paths = [WESAD_ROOT, "."]
+    
+    for path in search_paths:
+        if not os.path.exists(path): continue
+        for root, dirs, files in os.walk(path):
+            for file in files:
+                if file.endswith(".pkl") and file.startswith("S"):
+                   try:
+                       print(f"Found data file: {file}")
+                       full_path = os.path.join(root, file)
+                       return load_subject_pkl(full_path)
+                   except Exception as e:
+                       print(f"Error loading {file}: {e}")
+    return None
+
+def main():
+    data = get_real_data()
     
     if data is None:
         print("No WESAD .pkl files found locally. Using synthetic data.")

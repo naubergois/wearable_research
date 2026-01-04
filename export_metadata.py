@@ -1,6 +1,8 @@
 
 import json
 import numpy as np
+import matplotlib
+matplotlib.use('Agg')
 import visualize_signals
 import generate_figure_11
 
@@ -32,13 +34,58 @@ def get_figure_10_data():
     }
 
 def get_time_domain_data():
-    # Data for Time Domain Signals (Synthetic)
-    # Re-using generation logic from visualize_signals to ensure consistency
-    # Note: visualized_signals.generate_synthetic_data returns a nested dict
+    # Try to load real data
+    data = visualize_signals.get_real_data()
     
-    # We will generate a fresh batch. Since it's random, it won't be *identical* 
-    # to the png if we don't fix seed, but for "metadata export" usually representative data is fine
-    # or we can fix seed.
+    if data:
+        print("Using Real WESAD Data for Time Domain Metadata...")
+        wrist = data["signal"]["wrist"]
+        
+        # Slice 60 seconds (approx)
+        # Assuming 700Hz is base? No, wrist data has dict of signals with diff frequencies.
+        # EDA: 4Hz, TEMP: 4Hz, BVP: 64Hz, ACC: 32Hz
+        # We need to slice carefully.
+        
+        # Let's take a slice from the middle to avoid startup artifacts
+        duration_sec = 60
+        
+        # We'll just take the first N samples corresponding to 60s for each
+        # But let's offset by 5 minutes (300s) to be safe?
+        offset_sec = 300
+        
+        eda_sl = slice(offset_sec * 4, (offset_sec + duration_sec) * 4)
+        temp_sl = slice(offset_sec * 4, (offset_sec + duration_sec) * 4)
+        bvp_sl = slice(offset_sec * 64, (offset_sec + duration_sec) * 64)
+        acc_sl = slice(offset_sec * 32, (offset_sec + duration_sec) * 32)
+        
+        # Safety check on lengths
+        if len(wrist["EDA"]) < (offset_sec + duration_sec) * 4:
+            offset_sec = 0 # Fallback to start
+            eda_sl = slice(0, duration_sec * 4)
+            temp_sl = slice(0, duration_sec * 4)
+            bvp_sl = slice(0, duration_sec * 64)
+            acc_sl = slice(0, duration_sec * 32)
+        
+        return {
+        "title": "Time Domain Signals (Real WESAD - S2)",
+        "type": "time_series",
+        "sampling_rates": {
+            "EDA": 4,
+            "TEMP": 4,
+            "ACC": 32,
+            "BVP": 64
+        },
+        "signals": {
+            "EDA": wrist["EDA"].flatten()[eda_sl],
+            "TEMP": wrist["TEMP"].flatten()[temp_sl],
+            "BVP": wrist["BVP"].flatten()[bvp_sl],
+            "ACC_X": wrist["ACC"][acc_sl, 0],
+            "ACC_Y": wrist["ACC"][acc_sl, 1],
+            "ACC_Z": wrist["ACC"][acc_sl, 2]
+        }
+    }
+        
+    print("Real data not found, using synthetic...")
     np.random.seed(42) 
     data = visualize_signals.generate_synthetic_data(duration_sec=60)
     wrist = data["signal"]["wrist"]

@@ -2,12 +2,15 @@
 import numpy as np
 import tensorflow as tf
 from tensorflow.keras import layers, models, callbacks
+import matplotlib
+matplotlib.use('Agg')
 import matplotlib.pyplot as plt
 import seaborn as sns
 import json
 import os
 from sklearn.model_selection import train_test_split
 from train_models import generate_synthetic_dataset, build_mlp
+from wesad_data import load_data
 
 class NumpyEncoder(json.JSONEncoder):
     def default(self, obj):
@@ -19,8 +22,10 @@ def generate_figure_9():
     print("Generating Figure 9 (Learning Curves)...")
     
     # 1. Get Data
-    # We reuse the logic from train_models.py
-    _, X_feat, y, _ = generate_synthetic_dataset()
+    try:
+        X_feat, y, _ = load_data(mode="features")
+    except:
+        _, X_feat, y, _ = generate_synthetic_dataset()
     
     # Split for Train/Val (Standard split for this figure)
     X_train, X_val, y_train, y_val = train_test_split(X_feat, y, test_size=0.2, random_state=42)

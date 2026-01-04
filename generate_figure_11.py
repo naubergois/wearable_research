@@ -1,5 +1,7 @@
 
 import numpy as np
+import matplotlib
+matplotlib.use('Agg')
 import matplotlib.pyplot as plt
 import seaborn as sns
 import tensorflow as tf
@@ -23,7 +25,11 @@ def generate_figure_11():
         return
 
     # 2. Get Data Sample
-    X_raw, _, y, _ = generate_synthetic_dataset()
+    from wesad_data import load_data
+    try:
+         X_raw, y, _ = load_data(mode="raw")
+    except:
+         X_raw, _, y, _ = generate_synthetic_dataset()
     
     # Find a stress sample (class 1)
     stress_indices = np.where(y == 1)[0]
@@ -54,13 +60,8 @@ def generate_figure_11():
     # Normalize Saliency
     saliency = (saliency - saliency.min()) / (saliency.max() - saliency.min() + 1e-8)
     
-    # Get the BVP signal (index 5 in our synthetic gen: EDA, TEMP, ACCx,y,z, BVP)
-    # Wait, in generate_synthetic_dataset: 
-    # X_raw = np.random.randn(N_SAMPLES, 64, 6)
-    # It doesn't explicitly name cols, but let's assume BVP is the one we modified with sine waves?
-    # "X_raw[y == 1, :, 0] += ..." -> Index 0 has the signal added for stress.
-    # So let's visualize Index 0 as our "Signal of Interest"
-    bvp_signal = input_sample[:, 0]
+    # Get the BVP signal (index 5)
+    bvp_signal = input_sample[:, 5]
     
     # Time axis
     t = np.arange(len(bvp_signal))
