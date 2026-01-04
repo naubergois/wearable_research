@@ -56,6 +56,24 @@ def load_subject_pkl(path):
     with open(path, "rb") as f:
         return pickle.load(f, encoding="latin1")
 
+def generate_synthetic_dataset():
+    """Generates synthetic data matching the user's specific dimensions."""
+    print(f"Generating synthetic dataset with {N_SAMPLES} samples...")
+    
+    # 1. Random Features (N, 22)
+    y = np.random.choice([0, 1], size=N_SAMPLES, p=[0.7, 0.3]) 
+    groups = np.random.randint(2, 18, size=N_SAMPLES) 
+    
+    X_feat = np.random.randn(N_SAMPLES, 22)
+    X_feat[y == 1] += 0.5
+    
+    # 2. Random Raw Signals (N, 64, 6)
+    X_raw = np.random.randn(N_SAMPLES, 64, 6)
+    # Add some signal to stress class
+    X_raw[y == 1, :, 0] += np.sin(np.linspace(0, 10, 64)) * 0.5
+    
+    return X_raw, X_feat, y, groups
+
 def build_mlp(input_shape=None):
     # Using Sklearn MLPClassifier
     # Note: Sklearn models are instantiated, not "built" like Keras
