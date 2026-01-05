@@ -1,30 +1,36 @@
 {
-    "Feature": [
-        "EDA_max",
-        "ACC_std",
-        "ACC_peaks",
-        "EDA_mean",
-        "ACC_min",
-        "EDA_min",
-        "ACC_max",
-        "EDA_peaks",
-        "BVP_std",
-        "BVP_max",
-        "BVP_min",
-        "HR"
-    ],
-    "Importance": [
-        0.004256803907885509,
-        0.010886252616887604,
-        0.015003489183531005,
-        0.024912770411723607,
-        0.03314724354501044,
-        0.038032100488485675,
-        0.05003489183531049,
-        0.07997208653175153,
-        0.1001395673412421,
-        0.10739706908583387,
-        0.11235170969993016,
-        0.1736915561758548
-    ]
+    "title": "Atribui\u00e7\u00e3o m\u00e9dia de import\u00e2ncia das caracter\u00edsticas (Integrated Gradients)",
+    "type": "bar_horizontal",
+    "data": {
+        "features": [
+            "HR",
+            "TEMP_slope",
+            "ACC_min",
+            "BVP_std",
+            "ACC_std",
+            "EDA_slope",
+            "EDA_mean",
+            "EDA_std",
+            "EDA_min",
+            "EDA_max",
+            "EDA_peaks"
+        ],
+        "importance": [
+            0.0893,
+            0.085,
+            0.0421,
+            0.038,
+            0.035,
+            0.02,
+            0.018,
+            0.015,
+            0.01,
+            0.008,
+            0.005
+        ]
+    },
+    "labels": {
+        "x": "Feature Importance",
+        "y": "Feature"
+    }
 }
